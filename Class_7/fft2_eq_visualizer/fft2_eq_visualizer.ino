@@ -13,44 +13,30 @@
 #include <SD.h>
 #include <SerialFlash.h>
 
+#include <Audio.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <SD.h>
+#include <SerialFlash.h>
+
 // GUItool: begin automatically generated code
-AudioSynthWaveform       waveform3;      //xy=109.00568389892578,463.99999237060547
-AudioSynthWaveform       waveform1;      //xy=118.00566482543945,218.00000762939453
-AudioSynthWaveform       waveform2;      //xy=133.00568389892578,395.99999237060547
-AudioSynthNoiseWhite     noise1;         //xy=151.00568389892578,333.99999237060547
-AudioMixer4              mixer2;         //xy=210.00568771362305,524.9999628067017
-AudioSynthSimpleDrum     drum2;          //xy=238.00568389892578,701.9999923706055
-AudioEffectEnvelope      envelope1;      //xy=254.00565338134766,221.00000381469727
-AudioSynthNoiseWhite     noise2;         //xy=261.0056571960449,627.0000019073486
-AudioEffectEnvelope      envelope2;      //xy=353.0056610107422,445.99999237060547
-AudioFilterStateVariable filter1;        //xy=370.0056610107422,310.9999828338623
-AudioMixer4              mixer3;         //xy=410.0056838989258,660.9999923706055
-AudioSynthSimpleDrum     drum1;          //xy=427.0056838989258,179.99999237060547
-AudioEffectEnvelope      envelope3;      //xy=448.00565338134766,592.0000009536743
-AudioMixer4              mixer1;         //xy=569.0056838989258,288.99998664855957
-AudioOutputAnalog        dac1;           //xy=759.005615234375,303.9999755397439
-AudioAnalyzeFFT256       fft256_1;       //xy=800.0055809020996,356.91475105285645
-AudioAnalyzeRMS          rms1;           //xy=806.0056915283203,224.9147720336914
-AudioConnection          patchCord1(waveform3, 0, mixer2, 2);
-AudioConnection          patchCord2(waveform1, envelope1);
-AudioConnection          patchCord3(waveform2, 0, mixer2, 0);
-AudioConnection          patchCord4(noise1, 0, mixer2, 1);
-AudioConnection          patchCord5(mixer2, envelope2);
-AudioConnection          patchCord6(drum2, 0, mixer3, 1);
-AudioConnection          patchCord7(envelope1, 0, filter1, 0);
-AudioConnection          patchCord8(noise2, 0, mixer3, 0);
-AudioConnection          patchCord9(envelope2, 0, mixer1, 2);
-AudioConnection          patchCord10(filter1, 0, mixer1, 1);
-AudioConnection          patchCord11(mixer3, envelope3);
-AudioConnection          patchCord12(drum1, 0, mixer1, 0);
-AudioConnection          patchCord13(envelope3, 0, mixer1, 3);
-AudioConnection          patchCord14(mixer1, dac1);
-AudioConnection          patchCord15(mixer1, rms1);
-AudioConnection          patchCord16(mixer1, fft256_1);
-AudioControlSGTL5000     sgtl5000_1;     //xy=72.00568389892578,73.99999237060547
+AudioInputI2S            i2s1;           //xy=408,288
+AudioMixer4              mixer1;         //xy=561.5,301
+AudioOutputAnalog        dac1;           //xy=751.5,316
+AudioAnalyzeFFT256       fft256_1;       //xy=792.5,369
+AudioAnalyzeRMS          rms1;           //xy=798.5,237
+AudioConnection          patchCord1(i2s1, 0, mixer1, 0);
+AudioConnection          patchCord2(i2s1, 1, mixer1, 1);
+AudioConnection          patchCord3(mixer1, dac1);
+AudioConnection          patchCord4(mixer1, rms1);
+AudioConnection          patchCord5(mixer1, fft256_1);
+AudioControlSGTL5000     audioShield;     //xy=64.5,86
 // GUItool: end automatically generated code
 
-
+const int myInput = AUDIO_INPUT_MIC;
+float scale = 60.0;
+float level[16];
+int   shown[16];
 
 //led biz begin. don't worry about anything in this section besides max_brightness
 #include <WS2812Serial.h>
@@ -139,45 +125,15 @@ void setup() {
   //The easies way to do this is start with 10 and then if the print out of memory usage
   //goes above that, simply increase this value until you're a over the vale its reporting
   AudioMemory(20);
-
+  audioShield.enable();
+  audioShield.inputSelect(myInput);
+  audioShield.volume(0.5);
   //we define all of these in the block of code we copied fro the tool
   //now we have to tell them what to do
-  waveform1.begin(WAVEFORM_SINE); //begin(waveshape) //https://www.pjrc.com/teensy/gui/?info=AudioSynthWaveform
-  waveform1.amplitude(1); //amplitude from 0.0-1.0
-  waveform2.begin(WAVEFORM_SAWTOOTH_REVERSE);
-  waveform3.begin(WAVEFORM_SAWTOOTH);
 
-  mixer1.gain(0, 5); // (channel 0-3, gain 0 is off, .5 full, 1 no change, 2 double and so on
-  mixer1.gain(1, 5);
-  mixer1.gain(2, 1);
 
-  mixer2.gain(0, 3);
-  mixer2.gain(1, 5);
-  mixer2.gain(2, 5);
-  mixer2.gain(3, 5);
-
-  mixer3.gain(0, 5);
-  mixer3.gain(1, 5);
-
-  drum1.length(120); //Length of sound in milliseconds
-  drum1.frequency(300); //pitch in Hz
-  drum2.frequency(160);
-  drum2.length(120);
-  envelope1.release(250); //how long will the note fade out in millis after
-  filter1.frequency(500);
-  filter1.resonance(.7);
-  noise1.amplitude(.2);
-  noise2.amplitude(.5);
-  waveform2.amplitude(1);
-  waveform2.frequency(11500);
-  waveform3.amplitude(1);
-  waveform3.frequency(13500);
-
-  //envelope2.release(1);
-  envelope2.attack(5);
-  envelope2.decay(10);
-  envelope2.sustain(.5);
-  envelope2.release(1200);
+  mixer1.gain(0, 1); // (channel 0-3, gain 0 is off, .5 full, 1 no change, 2 double and so on
+  mixer1.gain(1, 0);
 }
 
 
@@ -189,31 +145,31 @@ void loop() {
   right_button.update();
 
 
-  if (left_button.fell()) { //much simpler way of saying  prev_button == 1 && button == 0
-    drum1.noteOn(); //only happens once and does not need a corresponding note off
-  }
-
-  if (freq[1] >= 500) {
-    envelope2.release (5);
-  }
-  if (freq[1] <= 500) {
-    envelope2.release (1200);
-  }
-
-  if (middle_button.fell()) {
-    envelope3.noteOn(); //only happens once
-
-
-  }
-  if (middle_button.rose()) {
-    envelope3.noteOff(); //only happens once. If it don't happen the note will just stay on
-  }
-  if (right_button.fell()) {
-    envelope2.noteOn(); //only happens once
-  }
-  if (right_button.rose()) {
-    envelope2.noteOff(); //only happens once. If it don't happen the note will just stay on
-  }
+//  if (left_button.fell()) { //much simpler way of saying  prev_button == 1 && button == 0
+//    drum1.noteOn(); //only happens once and does not need a corresponding note off
+//  }
+//
+//  if (freq[1] >= 500) {
+//    envelope2.release (5);
+//  }
+//  if (freq[1] <= 500) {
+//    envelope2.release (1200);
+//  }
+//
+//  if (middle_button.fell()) {
+//    envelope3.noteOn(); //only happens once
+//
+//
+//  }
+//  if (middle_button.rose()) {
+//    envelope3.noteOff(); //only happens once. If it don't happen the note will just stay on
+//  }
+//  if (right_button.fell()) {
+//    envelope2.noteOn(); //only happens once
+//  }
+//  if (right_button.rose()) {
+//    envelope2.noteOff(); //only happens once. If it don't happen the note will just stay on
+//  }
 
 
   if (current_time - prev_time[0] > 5) { // it's better to read a little more slowly the much faster bottom of the loop    prev_time[0] = current_time;
@@ -223,14 +179,14 @@ void loop() {
     bottom_left_pot = analogRead(bottom_left_pot_pin);
     bottom_right_pot = analogRead(bottom_right_pot_pin);
 
-    freq[0] = bottom_left_pot / 6.0;
-    freq[1] = bottom_right_pot / 6.0;
-    freq[2] = (top_right_pot / 4095.0) * 1500.0;
-    freq[4] = ((top_left_pot / 4095.0) * 5.0) + 0.7;
-    drum1.frequency(freq[0]);
-    waveform1.frequency(freq[1]);
-    filter1.frequency(freq[2]);
-    filter1.resonance(freq[4]);
+//    freq[0] = bottom_left_pot / 6.0;
+//    freq[1] = bottom_right_pot / 6.0;
+//    freq[2] = (top_right_pot / 4095.0) * 1500.0;
+//    freq[4] = ((top_left_pot / 4095.0) * 5.0) + 0.7;
+//    drum1.frequency(freq[0]);
+//    waveform1.frequency(freq[1]);
+//    filter1.frequency(freq[2]);
+//    filter1.resonance(freq[4]);
   }
 
   if (current_time - prev_time[1] > rate1) {

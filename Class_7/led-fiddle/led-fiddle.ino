@@ -4,12 +4,12 @@ Testing color settings
 
 // boilerplate LED init
 #include <WS2812Serial.h> 
-const int num_of_leds = 64;
+const int num_of_leds = 40;
 const int pin = 5; // only these pins can be used on the Teensy 3.2:  1, 5, 8, 10, 31
 byte drawingMemory[num_of_leds * 3];       //  3 bytes per LED
 DMAMEM byte displayMemory[num_of_leds * 12]; // 12 bytes per LED
 WS2812Serial leds(num_of_leds, displayMemory, drawingMemory, pin, WS2812_GRB);
-float max_brightness = 0.1;
+float max_brightness = 0.9;
 
 unsigned long current_time;
 unsigned long interval_time;

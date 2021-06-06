@@ -173,7 +173,7 @@ void loop() {
         Serial.println(current_pixel);
         if (current_pixel > 0 ) {
           float color1 = current_pixel / 8.0;
-          set_pixel_HSV(xy_count, .3 , 1, 1);
+          set_pixel_HSV(xy_count, .3 , 1, 1 );
         }
       }
     }

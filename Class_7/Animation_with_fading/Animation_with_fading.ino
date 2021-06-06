@@ -6,6 +6,9 @@
 
 //led biz begin. don't worry about anything in this section besides max_brightness
 #include <WS2812Serial.h>
+#include <Bounce2.h>
+#define BOUNCE_LOCK_OUT
+
 //we'll be using the Teensy audio library and it doesn't play nicely with neopixels.h or fastled
 // so Paul of PJRC made this much more efficient version
 #define num_of_leds 64
@@ -16,7 +19,7 @@ WS2812Serial leds(num_of_leds, displayMemory, drawingMemory, led_data_pin, WS281
 
 //1.0 is VERY bright if you're powering it off of 5V
 // this needs to be declared and set to something >0 for the LEDs to work
-float max_brightness = 0.2;
+float max_brightness = 0.9;
 //led biz end
 
 //defines are not variables
@@ -27,6 +30,9 @@ float max_brightness = 0.2;
 #define top_right_pot_pin A1
 #define bottom_left_pot_pin A2
 #define bottom_right_pot_pin A3
+
+Bounce left_button = Bounce();
+Bounce right_button = Bounce();
 
 unsigned long current_time;
 unsigned long prev_time[8];
@@ -42,6 +48,7 @@ int pot[4];
 int animation_rate;
 int animation_frame, next_frame;
 float fade, inv_fade;
+float fade_pot;
 
 #define bitmap_width  8
 #define bitmap_height 8
@@ -54,34 +61,34 @@ float fade, inv_fade;
 byte bitmap[total_frames][bitmap_width * bitmap_height] =
 {
   {
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 1, 1, 0, 0, 0,
-    0, 0, 0, 1, 1, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
+    8, 8, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8,
+    6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6,
+    4, 4, 4, 4, 4, 4, 4, 4,
+    4, 4, 4, 4, 4, 4, 4, 4,
+    2, 2, 2, 2, 2, 2, 2, 2,
+    2, 2, 2, 2, 2, 2, 2, 2,
   },
   {
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 3, 0, 0, 0, 0, 3, 0,
-    0, 0, 0, 2, 2, 0, 0, 0,
-    0, 0, 2, 0, 0, 3, 0, 0,
-    0, 0, 2, 0, 0, 3, 0, 0,
-    0, 0, 0, 2, 2, 0, 0, 0,
-    0, 3, 0, 0, 0, 0, 3, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
+    6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6,
+    4, 4, 4, 4, 4, 4, 4, 4,
+    4, 4, 4, 4, 4, 4, 4, 4,
+    2, 2, 2, 2, 2, 2, 2, 2,
+    2, 2, 2, 2, 2, 2, 2, 2,
+    8, 8, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8,
   },
   {
-    3, 0, 0, 0, 0, 0, 0, 3,
-    0, 0, 4, 5, 5, 4, 0, 0,
-    0, 4, 0, 0, 0, 0, 4, 0,
-    8, 5, 0, 0, 0, 0, 5, 8,
-    8, 5, 0, 0, 0, 0, 5, 8,
-    0, 4, 0, 0, 0, 0, 4, 0,
-    0, 0, 4, 5, 5, 4, 0, 0,
-    3, 0, 0, 0, 0, 0, 0, 3,
+    4, 4, 4, 4, 4, 4, 4, 4,
+    4, 4, 4, 4, 4, 4, 4, 4,
+    2, 2, 2, 2, 2, 2, 2, 2,
+    2, 2, 2, 2, 2, 2, 2, 2,
+    8, 8, 8, 8, 8, 8, 8, 8,
+    8, 8, 8, 8, 8, 8, 8, 8,
+    6, 6, 6, 6, 6, 6, 6, 6,
+    6, 6, 6, 6, 6, 6, 6, 6,
   }
 };
 
@@ -90,6 +97,11 @@ void setup() {
 
   pinMode(left_button_pin, INPUT_PULLUP); //must be done when reading buttons
   pinMode(right_button_pin, INPUT_PULLUP);
+  left_button.attach(left_button_pin); //what pin will it read
+  left_button.interval(10); //how many milliseconds of debounce time
+  right_button.attach(right_button_pin); //what pin will it read
+  right_button.interval(10); //how many milliseconds of debounce time
+
   analogReadResolution(12); //0-4095 pot values
   analogReadAveraging(64);  //smooth the readings some
 }
@@ -98,14 +110,24 @@ void setup() {
 void loop() {
   current_time = millis();
 
+  left_button.update(); //check the debouncers
+  right_button.update();
+
   if (current_time - prev_time[2] > 5) { //fast timer to read controls
     prev_time[2] = current_time;
     pot[1] = (analogRead(top_left_pot_pin) / 4095.0) * 2000;
-    float fade_pot = (analogRead(top_right_pot_pin) / 4095.0) * .2;
+    pot[2] = (analogRead(top_right_pot_pin) / 4095.0) * 7;
+    pot[3] = (analogRead(bottom_left_pot_pin) / 4095.0);
 
     animation_rate = pot[1];
+    fade_pot = pot[2];
+//    max_brightness = pot[3];
 
-    fade *= 1.0 - fade_pot;
+  }
+
+  if (current_time - prev_time[1] > fade_pot) { //fast timer to read controls
+    prev_time[1] = current_time;
+    fade /= 1.05;
     if (fade < .01) {
       fade = 0;
     }
@@ -115,20 +137,28 @@ void loop() {
     }
   }
 
-  if (current_time - prev_time[1] > animation_rate) { //fast timer to read controls
-    prev_time[1] = current_time;
-    //animation_frame++;
-    animation_frame = random(0, 3);
+
+  //    if (current_time - prev_time[1] > animation_rate) { //fast timer to read controls
+  //      prev_time[1] = current_time;
+  //  animation_frame = 1;
+  if (left_button.fell()) {
+    animation_frame ++;
     if (animation_frame > total_frames - 1) {
       animation_frame = 0;
-    }
-    next_frame = random(0, 3);
-    if (next_frame > total_frames - 1) {
-      next_frame = 0;
     }
     fade = 1;
     inv_fade = .01;
   }
+  //    animation_frame = random(0, 3);
+  //  if (animation_frame > total_frames - 1) {
+  //    animation_frame = 0;
+  //  }
+  //  next_frame = animation_frame;
+  //  if (next_frame > total_frames - 1) {
+  //    next_frame = 0;
+  //  }
+
+  //}
 
   if (current_time - prev_time[0] > rate1) {
     prev_time[0] = current_time;
@@ -141,16 +171,17 @@ void loop() {
 
         int current_pixel = bitmap[animation_frame][xy_count];
 
-        int next_pixel = bitmap[next_frame][xy_count];
+        //        int next_pixel = bitmap[next_frame][xy_count];
 
         if (current_pixel > 0 ) {
           float color1 = current_pixel / 8.0;
           set_pixel_HSV(xy_count, color1 , 1, fade);
-        }
-        if (next_pixel > 0 ) {
-          float color1 = next_pixel / 8.0;
           set_pixel_HSV(xy_count, color1 , 1, inv_fade);
         }
+        //        if (next_pixel > 0 ) {
+        //          float color1 = next_pixel / 8.0;
+        //          set_pixel_HSV(xy_count, color1 , 1, inv_fade);
+        //        }
       }
     }
     leds.show(); // after we've set what we want all the LEDs to be we send the data out through this function
@@ -226,4 +257,15 @@ void set_pixel_HSV(int pixel, float fh, float fs, float fv) {
       break;
   }
   leds.setPixelColor(pixel, RedLight, GreenLight, BlueLight);
+  Serial.print("button 1");
+  Serial.print(" - ");
+  Serial.print(digitalRead(left_button_pin));
+  Serial.print("fade ");
+  Serial.print(fade);
+  Serial.print(" - ");
+  Serial.print("inv fade ");
+  Serial.print(inv_fade);
+  Serial.print("animation_frame ");
+  Serial.print(animation_frame);
+  Serial.println();
 }
